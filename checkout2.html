@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Demo Checkout (Hosted iFrame ready)</title>
+<style>
+  :root { --accent:#0a66c2; --bg:#f6f7f9; --card:#fff; --muted:#666; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; background:var(--bg); color:#111; }
+  header { background:#111; color:#fff; padding:12px 16px; }
+  header h1 { margin:0; font-size:18px; }
+
+  .container { max-width:1100px; margin:24px auto; padding:0 16px; }
+
+  .steps { display:flex; gap:8px; font-size:14px; margin-bottom:16px; flex-wrap:wrap; }
+  .step { padding:8px 12px; border-radius:18px; background:#e9ecf1; color:#333; cursor:pointer; user-select:none; }
+  .step.active { background:var(--accent); color:#fff; }
+
+  .grid { display:grid; grid-template-columns:1fr 380px; gap:24px; align-items:start; }
+  @media (max-width: 960px) { .grid { grid-template-columns:1fr; } }
+
+  .card { background:var(--card); border-radius:10px; box-shadow:0 2px 10px rgba(0,0,0,.06); padding:16px; }
+  h2 { margin:0 0 12px; font-size:18px; }
+
+  table { width:100%; border-collapse:collapse; margin:8px 0 0; }
+  th, td { padding:10px; text-align:center; }
+  th { background:#f0f2f5; font-weight:600; }
+  tr + tr td { border-top:1px solid #eee; }
+
+  .left { text-align:left; }
+  .right { text-align:right; }
+  .muted { color:var(--muted); font-size:13px; }
+  .hr { height:1px; background:#eee; margin:12px 0; }
+
+  input[type=number] { width:70px; padding:6px; border:1px solid #ccd; border-radius:6px; text-align:right; }
+
+  .row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .row3 { display:grid; grid-template-columns:1.2fr .8fr .8fr; gap:12px; }
+  label { display:block; font-size:13px; color:#333; margin:8px 0 6px; }
+  input[type=text], input[type=email], input[type=tel], select {
+    width:100%; padding:10px; border:1px solid #ccd; border-radius:8px; background:#fff;
+  }
+
+  .summary-row { display:flex; justify-content:space-between; margin:6px 0; }
+  .summary-total { font-weight:700; font-size:18px; }
+
+  .btn { display:inline-block; width:100%; text-align:center; padding:12px 14px; background:var(--accent); color:#fff; border:none; border-radius:8px; font-weight:600; cursor:pointer; }
+  .btn.secondary { background:#222; }
+  .btn:disabled { opacity:.6; cursor:not-allowed; }
+
+  .hidden { display:none; }
+  .badge { background:#eef5ff; color:#134c96; padding:2px 8px; border-radius:999px; font-size:12px; }
+
+  /* Hosted iFrame wrapper */
+  .iframe-shell { border:1px solid #dde1e7; border-radius:8px; overflow:hidden; background:#fff; }
+  .iframe-header { display:flex; justify-content:space-between; align-items:center; padding:10px 12px; background:#f7f9fc; border-bottom:1px solid #e6eaf0; }
+  .iframe-header span { font-weight:600; }
+  .iframe-footer { padding:10px 12px; background:#f7f9fc; border-top:1px solid #e6eaf0; font-size:12px; color:#666; }
+  #hostedFrame { width:100%; height:420px; border:0; display:block; }
+</style>
+</head>
+<body>
+<header><h1>Demo Checkout</h1></header>
+
+<div class="container">
+  <!-- Progress (clickable) -->
+  <div class="steps">
+    <div class="step active" id="pill-summary"   data-step="summary">1. Order Summary</div>
+    <div class="step"         id="pill-shipping"  data-step="shipping">2. Shipping</div>
+    <div class="step"         id="pill-payment"   data-step="payment">3. Payment</div>
+    <div class="step"         id="pill-confirm"   data-step="confirm">4. Confirmation</div>
+  </div>
+
+  <div class="grid">
+    <!-- LEFT -->
+    <div>
+      <!-- STEP 1: ORDER SUMMARY -->
+      <div class="card" id="card-summary">
+        <h2>Order Summary</h2>
+        <div class="muted">Adjust quantities; totals update automatically.</div>
+        <table id="cartTable" aria-label="Shopping cart">
+          <thead>
+            <tr>
+              <th class="left">Product</th>
+              <th>Price</th>
+              <th>Qty</th>
+              <th class="right">Line</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr data-price="0.99">
+              <td class="left">Apple</td>
+              <td>$0.99</td>
+              <td><input type="number" min="0" value="1" /></td>
+              <td class="right line-total">$0.99</td>
+            </tr>
+            <tr data-price="2.50">
+              <td class="left">Bread</td>
+              <td>$2.50</td>
+              <td><input type="number" min="0" value="2" /></td>
+              <td class="right line-total">$5.00</td>
+            </tr>
+            <tr data-price="1.75">
+              <td class="left">Milk</td>
+              <td>$1.75</td>
+              <td><input type="number" min="0" value="1" /></td>
+              <td class="right line-total">$1.75</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="hr"></div>
+        <button class="btn" id="toShipping">Continue to Shipping</button>
+      </div>
+
+      <!-- STEP 2: SHIPPING -->
+      <div class="card hidden" id="card-shipping">
+        <h2>Shipping</h2>
+        <div class="muted">Enter your address and choose a shipping method.</div>
+
+        <div class="row">
+          <div>
+            <label for="first">First name</label>
+            <input id="first" type="text" autocomplete="given-name" />
+          </div>
+          <div>
+            <label for="last">Last name</label>
+            <input id="last" type="text" autocomplete="family-name" />
+          </div>
+        </div>
+
+        <label for="addr1">Address</label>
+        <input id="addr1" type="text" autocomplete="address-line1" />
+        <label for="addr2" class="muted">Apt, suite (optional)</label>
+        <input id="addr2" type="text" autocomplete="address-line2" />
+
+        <div class="row3">
+          <div>
+            <label for="city">City</label>
+            <input id="city" type="text" autocomplete="address-level2" />
+          </div>
+          <div>
+            <label for="state">State/Province</label>
+            <input id="state" type="text" autocomplete="address-level1" />
+          </div>
+          <div>
+            <label for="zip">ZIP/Postal</label>
+            <input id="zip" type="text" autocomplete="postal-code" />
+          </div>
+        </div>
+
+        <div class="row">
+          <div>
+            <label for="country">Country</label>
+            <select id="country">
+              <option value="US" selected>United States</option>
+              <option value="CA">Canada</option>
+              <option value="GB">United Kingdom</option>
+              <option value="AU">Australia</option>
+            </select>
+          </div>
+          <div>
+            <label for="phone">Phone</label>
+            <input id="phone" type="tel" autocomplete="tel" />
+          </div>
+        </div>
+
+        <label for="email">Email (for order updates)</label>
+        <input id="email" type="email" autocomplete="email" />
+
+        <div class="hr"></div>
+        <div class="left" style="display:flex;align-items:center;gap:8px;">
+          <strong>Shipping method</strong> <span class="badge" id="shipEta">ETA 3–5 business days</span>
+        </div>
+        <div class="row">
+          <label style="display:flex;gap:8px;align-items:center;">
+            <input type="radio" name="ship" value="0" data-label="Standard (3–5 business days)" checked />
+            Standard — $0.00
+          </label>
+          <label style="display:flex;gap:8px;align-items:center;">
+            <input type="radio" name="ship" value="9.99" data-label="Express (1–2 business days)" />
+            Express — $9.99
+          </label>
+        </div>
+
+        <div class="hr"></div>
+        <div class="row">
+          <button class="btn secondary" id="backToSummary">Back to Summary</button>
+          <button class="btn" id="toPayment">Continue to Payment</button>
+        </div>
+      </div>
+
+      <!-- STEP 3: PAYMENT (Hosted iFrame placeholder) -->
+      <div class="card hidden" id="card-payment">
+        <h2>Payment</h2>
+        <div class="muted">Hosted card entry is embedded below. Replace the iFrame <code>src</code> when you have your Curbstone URL.</div>
+
+        <div class="iframe-shell" id="iframeShell">
+          <div class="iframe-header">
+            <span>Secure Card Entry (Hosted)</span>
+            <small class="muted">PCI data handled by provider</small>
+          </div>
+
+          <!-- 🔒 Hosted iFrame placeholder
+               Replace IFRAME_SRC with your Curbstone hosted card URL, e.g.:
+               https://pay.curbstone.com/plp?session_id=YOUR_SESSION_ID
+               (Use your actual host + params from Curbstone)
+          -->
+          <iframe
+            id="hostedFrame"
+            title="Hosted Card Entry"
+            src="about:blank"
+            allow="payment *"
+            sandbox="allow-forms allow-scripts allow-same-origin"
+            referrerpolicy="no-referrer"
+          ></iframe>
+
+          <div class="iframe-footer">
+            This demo does not transmit card data. In production, this frame would be served by Curbstone.
+          </div>
+        </div>
+
+        <div class="hr"></div>
+        <div class="row">
+          <button class="btn secondary" id="backToShipping">Back to Shipping</button>
+          <button class="btn" id="placeOrder">Place Order</button>
+        </div>
+      </div>
+
+      <!-- STEP 4: CONFIRMATION -->
+      <div class="card hidden" id="card-confirmation">
+        <h2>Confirmation</h2>
+        <p class="muted" id="confirmMsg">Thank you! Your order has been placed.</p>
+        <div id="confirmDetails"></div>
+        <div class="hr"></div>
+        <button class="btn" id="newOrder">Start New Order</button>
+      </div>
+    </div>
+
+    <!-- RIGHT: ORDER TOTALS -->
+    <aside class="card" id="summary">
+      <h2>Totals</h2>
+      <div class="summary-row"><span>Subtotal</span><span id="sumSubtotal">$0.00</span></div>
+      <div class="summary-row"><span>Shipping</span><span id="sumShipping">$0.00</span></div>
+      <div class="summary-row"><span>Tax (8%)</span><span id="sumTax">$0.00</span></div>
+      <div class="hr"></div>
+      <div class="summary-row summary-total"><span>Total</span><span id="sumTotal">$0.00</span></div>
+      <div class="muted" style="margin-top:10px;">Demo page. No data is sent anywhere.</div>
+    </aside>
+  </div>
+</div>
+
+<script>
+  // ---------------- Utilities & math ----------------
+  const fmt = n => '$' + (Math.round(n * 100) / 100).toFixed(2);
+
+  function computeSubtotal() {
+    let total = 0;
+    document.querySelectorAll('#cartTable tbody tr').forEach(row => {
+      const price = parseFloat(row.dataset.price || '0');
+      const qty = parseInt(row.querySelector('input[type=number]').value || '0', 10);
+      const line = price * qty;
+      row.querySelector('.line-total').textContent = fmt(line);
+      total += line;
+    });
+    return total;
+  }
+
+  function refreshSummary() {
+    const subtotal = computeSubtotal();
+    const ship = parseFloat(document.querySelector('input[name=ship]:checked')?.value || '0');
+    const tax = subtotal > 0 ? subtotal * 0.08 : 0;
+    const total = subtotal + ship + tax;
+
+    document.getElementById('sumSubtotal').textContent = fmt(subtotal);
+    document.getElementById('sumShipping').textContent = fmt(ship);
+    document.getElementById('sumTax').textContent = fmt(tax);
+    document.getElementById('sumTotal').textContent = fmt(total);
+
+    const checked = document.querySelector('input[name=ship]:checked');
+    const eta = checked?.dataset.label?.includes('Express') ? 'ETA 1–2 business days' : 'ETA 3–5 business days';
+    const pill = document.getElementById('shipEta');
+    if (pill) pill.textContent = eta;
+  }
+
+  // ---------------- Stepper ----------------
+  function setStep(step) {
+    const ids = ['summary','shipping','payment','confirm'];
+    const cards = {
+      summary: 'card-summary',
+      shipping: 'card-shipping',
+      payment:  'card-payment',
+      confirm:  'card-confirmation'
+    };
+    ids.forEach(id => {
+      const show = (id === step);
+      document.getElementById(cards[id]).classList.toggle('hidden', !show);
+      document.getElementById('pill-' + id).classList.toggle('active', show);
+    });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  // Make pills clickable
+  document.querySelectorAll('.steps .step').forEach(pill => {
+    pill.addEventListener('click', () => {
+      const step = pill.dataset.step;
+      setStep(step);
+    });
+  });
+
+  // Buttons
+  document.getElementById('toShipping').addEventListener('click', () => setStep('shipping'));
+  document.getElementById('backToSummary').addEventListener('click', () => setStep('summary'));
+  document.getElementById('toPayment').addEventListener('click', () => setStep('payment'));
+  document.getElementById('backToShipping').addEventListener('click', () => setStep('shipping'));
+
+  // Demo “place order”
+  document.getElementById('placeOrder').addEventListener('click', () => {
+    // In production:
+    //  - Wait for hosted iFrame to return a success token/status (postMessage or server-side status).
+    //  - Then show confirmation.
+    buildConfirmation();
+    setStep('confirm');
+  });
+
+  document.getElementById('newOrder').addEventListener('click', () => {
+    document.querySelectorAll('#cartTable input[type=number]').forEach(inp => inp.value = (inp.defaultValue || 0));
+    refreshSummary();
+    setStep('summary');
+  });
+
+  // Hosted iFrame bootstrap (placeholder src)
+  const HOSTED_IFRAME_SRC = 'about:blank'; // ← Replace with Curbstone PLP/Hosted Fields URL when ready
+  const hostedFrame = document.getElementById('hostedFrame');
+  hostedFrame.src = HOSTED_IFRAME_SRC;
+
+  // Example postMessage listener (adjust event origin & payload per Curbstone docs)
+  window.addEventListener('message', (event) => {
+    // TODO: replace "https://your-curbstone-host" with actual origin
+    // if (event.origin !== 'https://your-curbstone-host') return;
+
+    // Expected success message example:
+    // { type: 'curbstone:payment', status: 'authorized', token: 'tok_123', amount: 123.45 }
+    const data = event.data || {};
+    if (data && data.type === 'curbstone:payment') {
+      if (data.status === 'authorized' || data.status === 'captured') {
+        // Optionally POST to your server to finalize order, then:
+        buildConfirmation();
+        setStep('confirm');
+      } else {
+        alert('Payment failed: ' + (data.message || 'Unknown error'));
+      }
+    }
+  });
+
+  // ---------------- Confirmation content ----------------
+  function buildConfirmation() {
+    const orderId = 'NUC-' + Math.floor(Math.random() * 900000 + 100000);
+    const name = (document.getElementById('first').value || '') + ' ' + (document.getElementById('last').value || '');
+    const addr = [
+      document.getElementById('addr1').value,
+      document.getElementById('addr2').value,
+      (document.getElementById('city').value || '') + ', ' + (document.getElementById('state').value || '') + ' ' + (document.getElementById('zip').value || ''),
+      document.getElementById('country').value
+    ].filter(Boolean).join('<br>');
+
+    const totals = {
+      sub: document.getElementById('sumSubtotal').textContent,
+      ship: document.getElementById('sumShipping').textContent,
+      tax: document.getElementById('sumTax').textContent,
+      total: document.getElementById('sumTotal').textContent
+    };
+    const shipLabel = document.querySelector('input[name=ship]:checked')?.dataset.label || 'Standard';
+
+    let lines = '<table style="width:100%;border-collapse:collapse;margin-top:8px;">' +
+                '<tr style="background:#f0f2f5;"><th style="text-align:left;padding:8px;">Item</th><th>Qty</th><th class="right" style="padding:8px;">Line</th></tr>';
+    document.querySelectorAll('#cartTable tbody tr').forEach(row => {
+      const title = row.children[0].textContent;
+      const qty = row.querySelector('input[type=number]').value;
+      const line = row.querySelector('.line-total').textContent;
+      if (parseInt(qty,10) > 0) {
+        lines += `<tr><td class="left" style="padding:8px;">${title}</td><td style="text-align:center;">${qty}</td><td class="right" style="padding:8px;">${line}</td></tr>`;
+      }
+    });
+    lines += '</table>';
+
+    document.getElementById('confirmMsg').innerHTML =
+      `Thank you, <strong>${name || 'Shopper'}</strong>! Your order <strong>${orderId}</strong> has been placed.`;
+
+    document.getElementById('confirmDetails').innerHTML = `
+      <div class="hr"></div>
+      <div><strong>Ship To</strong><br>${addr || 'No address provided'}</div>
+      <div class="hr"></div>
+      <div><strong>Items</strong>${lines}</div>
+      <div class="hr"></div>
+      <div><strong>Shipping Method</strong><br>${shipLabel}</div>
+      <div class="hr"></div>
+      <div><strong>Totals</strong><br>
+        Subtotal ${totals.sub}<br>
+        Shipping ${totals.ship}<br>
+        Tax ${totals.tax}<br>
+        <strong>Total ${totals.total}</strong>
+      </div>
+    `;
+  }
+
+  // Initial render
+  document.querySelectorAll('#cartTable input[type=number]').forEach(inp => inp.addEventListener('input', refreshSummary));
+  document.querySelectorAll('input[name=ship]').forEach(r => r.addEventListener('change', refreshSummary));
+  refreshSummary();
+  setStep('summary');
+</script>
+</body>
+</html>
