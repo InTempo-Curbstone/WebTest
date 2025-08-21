@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Test Checkout</title>
+<style>
+  :root { --accent:#0a66c2; --bg:#f6f7f9; --card:#fff; --muted:#666; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; background: var(--bg); color:#111; }
+  header { background:#111; color:#fff; padding:12px 16px; }
+  header h1 { margin:0; font-size:18px; }
+  .container { max-width:1100px; margin:24px auto; padding:0 16px; }
+  .steps { display:flex; gap:8px; font-size:14px; margin-bottom:16px; flex-wrap:wrap; }
+  .step { padding:8px 12px; border-radius:18px; background:#e9ecf1; color:#333; cursor:pointer; }
+  .step.active { background:var(--accent); color:#fff; }
+  .grid { display:grid; grid-template-columns:1fr 380px; gap:24px; align-items:start; }
+  @media (max-width: 960px) { .grid { grid-template-columns:1fr; } }
+  .card { background:var(--card); border-radius:10px; box-shadow:0 2px 10px rgba(0,0,0,.06); padding:16px; }
+  h2 { margin:0 0 12px; font-size:18px; }
+  table { width:100%; border-collapse:collapse; margin:8px 0 0; }
+  th, td { padding:10px; text-align:center; }
+  th { background:#f0f2f5; font-weight:600; }
+  tr + tr td { border-top:1px solid #eee; }
+  input[type=number] { width:70px; padding:6px; border:1px solid #ccd; border-radius:6px; text-align:right; }
+  .right { text-align:right; }
+  .muted { color:var(--muted); font-size:13px; }
+  .summary-row { display:flex; justify-content:space-between; margin:6px 0; }
+  .summary-total { font-weight:700; font-size:18px; }
+  .btn { display:inline-block; width:100%; text-align:center; padding:12px 14px; background:var(--accent); color:#fff; border:none; border-radius:8px; font-weight:600; cursor:pointer; }
+  .btn:disabled { opacity:.6; cursor:not-allowed; }
+  .btn.secondary { background:#222; }
+  .row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .row3 { display:grid; grid-template-columns:1.2fr .8fr .8fr; gap:12px; }
+  label { display:block; font-size:13px; color:#333; margin:8px 0 6px; }
+  input[type=text], input[type=email], input[type=tel], select { width:100%; padding:10px; border:1px solid #ccd; border-radius:8px; background:#fff; }
+  .hidden { display:none; }
+  .inline { display:flex; gap:8px; align-items:center; }
+  .badge { background:#eef5ff; color:#134c96; padding:2px 8px; border-radius:999px; font-size:12px; }
+  .hr { height:1px; background:#eee; margin:12px 0; }
+  footer { text-align:center; padding:24px; color:#777; font-size:13px; }
+  /* Payment iFrame container */
+  #plp-shell { border:1px solid #ccd; border-radius:10px; overflow:hidden; }
+  #plp-iframe { display:none; width:100%; min-height:360px; border:0; }
+  .captcha-note { margin:8px 0 12px; background:#fff7cc; border:1px solid #ffe08a; padding:10px; border-radius:6px; font-size:13px; }
+</style>
+</head>
+<body>
+<header><h1>Demo Checkout</h1></header>
+
+<div class="container">
+  <!-- Progress -->
+  <div class="steps">
+    <div class="step active" id="step-pill-shipping">1. Shipping</div>
+    <div class="step" id="step-pill-payment">2. Payment</div>
+    <div class="step" id="step-pill-review">3. Review</div>
+  </div>
+
+  <div class="grid">
+    <!-- LEFT: main content -->
+    <div>
+      <!-- CART -->
+      <div class="card" id="card-cart">
+        <h2>Cart</h2>
+        <div class="muted">Adjust quantities; totals update automatically.</div>
+        <table id="cartTable" aria-label="Shopping cart">
+          <thead>
+            <tr>
+              <th class="left" style="text-align:left">Product</th>
+              <th>Price</th>
+              <th>Qty</th>
+              <th class="right">Line</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr data-price="0.99">
+              <td class="left" style="text-align:left">Apple</td>
+              <td>$0.99</td>
+              <td><input type="number" min="0" value="1" /></td>
+              <td class="right line-total">$0.99</td>
+            </tr>
+            <tr data-price="2.50">
+              <td class="left" style="text-align:left">Bread</td>
+              <td>$2.50</td>
+              <td><input type="number" min="0" value="2" /></td>
+              <td class="right line-total">$5.00</td>
+            </tr>
+            <tr data-price="1.75">
+              <td class="left" style="text-align:left">Milk</td>
+              <td>$1.75</td>
+              <td><input type="number" min="0" value="1" /></td>
+              <td class="right line-total">$1.75</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- SHIPPING -->
+      <div class="card" id="card-shipping">
+        <h2>Shipping</h2>
+        <div class="muted">Enter your shipping address. Choose a method to update totals.</div>
+
+        <div class="row">
+          <div>
+            <label for="first">First name</label>
+            <input id="first" type="text" autocomplete="given-name" />
+          </div>
+          <div>
+            <label for="last">Last name</label>
+            <input id="last" type="text" autocomplete="family-name" />
+          </div>
+        </div>
+
+        <label for="addr1">Address</label>
+        <input id="addr1" type="text" autocomplete="address-line1" />
+        <label for="addr2" class="muted">Apt, suite (optional)</label>
+        <input id="addr2" type="text" autocomplete="address-line2" />
+
+        <div class="row3">
+          <div>
+            <label for="city">City</label>
+            <input id="city" type="text" autocomplete="address-level2" />
+          </div>
+          <div>
+            <label for="state">State/Province</label>
+            <input id="state" type="text" autocomplete="address-level1" />
+          </div>
+          <div>
+            <label for="zip">ZIP/Postal</label>
+            <input id="zip" type="text" autocomplete="postal-code" />
+          </div>
+        </div>
+
+        <div class="row">
+          <div>
+            <label for="country">Country</label>
+            <select id="country">
+              <option value="US" selected>United States</option>
+              <option value="CA">Canada</option>
+              <option value="GB">United Kingdom</option>
+              <option value="AU">Australia</option>
+            </select>
+          </div>
+          <div>
+            <label for="phone">Phone</label>
+            <input id="phone" type="tel" autocomplete="tel" />
+          </div>
+        </div>
+
+        <label for="email">Email (for order updates)</label>
+        <input id="email" type="email" autocomplete="email" />
+
+        <div class="hr"></div>
+        <div class="inline">
+          <span>Shipping method</span>
+          <span class="badge" id="shipEta">ETA 3–5 business days</span>
+        </div>
+        <div class="row">
+          <label class="inline"><input type="radio" name="ship" value="0" data-label="Standard (3–5 business days)" checked /> Standard — $0.00</label>
+          <label class="inline"><input type="radio" name="ship" value="9.99" data-label="Express (1–2 business days)" /> Express — $9.99</label>
+        </div>
+
+        <div class="hr"></div>
+
+        <!-- CAPTCHA REQUIREMENT (placeholder) -->
+        <div class="captcha-note">
+          <label class="inline">
+            <input type="checkbox" id="devCaptcha" />
+            I’m human (developer toggle). Replace with reCAPTCHA on the page before Payment per Curbstone requirement.
+          </label>
+        </div>
+
+        <button class="btn" id="btnToPayment">Continue to Payment</button>
+      </div>
+
+      <!-- BEGIN PAYMENT (PLP) -->
+      <div class="card hidden" id="card-payment">
+        <h2>Payment</h2>
+        <div class="muted">This step uses Curbstone’s Hosted iFrame (PLP). No card data touches your server.</div>
+
+        <!-- The iFrame must start hidden; plp.js will reveal it -->
+        <div id="plp-shell">
+          <iframe id="plp-iframe" title="Secure Card Entry"></iframe>
+        </div>
+
+        <!-- Non‑JS fallback: redirect mode -->
+        <noscript>
+          <p class="muted" style="margin-top:10px;">
+            JavaScript is required for embedded payment. Continue via
+            <a id="plp-redirect-link" href="#">the payment portal</a>.
+          </p>
+        </noscript>
+
+        <div class="hr"></div>
+        <button class="btn secondary" id="btnBackToShip">Back to Shipping</button>
+        <div style="height:8px"></div>
+        <button class="btn" id="btnToReview">Review & Place Order</button>
+      </div>
+      <!-- END PAYMENT (PLP) -->
+
+      <!-- REVIEW -->
+      <div class="card hidden" id="card-review">
+        <h2>Review</h2>
+        <div id="reviewBlock" class="muted">Review details will appear here…</div>
+        <div class="hr"></div>
+        <button class="btn secondary" id="btnBackToPayment">Back to Payment</button>
+        <div style="height:8px"></div>
+        <button class="btn" id="btnPlaceOrder">Place Order</button>
+      </div>
+    </div>
+
+    <!-- RIGHT: order summary -->
+    <aside class="card" id="summary">
+      <h2>Order Summary</h2>
+      <div class="summary-row"><span>Subtotal</span><span id="sumSubtotal">$0.00</span></div>
+      <div class="summary-row"><span>Shipping</span><span id="sumShipping">$0.00</span></div>
+      <div class="summary-row"><span>Tax (8%)</span><span id="sumTax">$0.00</span></div>
+      <div class="hr"></div>
+      <div class="summary-row summary-total"><span>Total</span><span id="sumTotal">$0.00</span></div>
+      <div class="muted" style="margin-top:10px;">This is a demo page. No data is sent anywhere.</div>
+    </aside>
+  </div>
+</div>
+
+<footer>Demo checkout • Apache test page</footer>
+
+<script>
+  // ------- CONFIG (adjust for SANDBOX vs LIVE) -------
+  // Use SANDBOX while developing:
+  const PLP_BASE_URL = 'https://c3sbx.net/curbstone/plp/'; // sandbox
+  // Switch to LIVE when ready:
+  // const PLP_BASE_URL = 'https://c3plp.net/curbstone/plp/'; // live
+
+  // Inject MFSESS from your server after Step 1 (see PHP example below)
+  let MFSESS = 'REPLACE_WITH_MFSESS'; // e.g. 'ABC123...'
+
+  // Optionally set your cart’s target page (MPTRGT) server-side.
+  // This HTML doesn’t set MPTRGT; your server specifies it during Step 1 init.
+
+  // ------- Utilities -------
+  const fmt = n => '$' + (Math.round(n * 100) / 100).toFixed(2);
+
+  function computeSubtotal() {
+    let total = 0;
+    document.querySelectorAll('#cartTable tbody tr').forEach(row => {
+      const price = parseFloat(row.dataset.price || '0');
+      const qty = parseInt(row.querySelector('input[type=number]').value || '0', 10);
+      const line = price * qty;
+      row.querySelector('.line-total').textContent = fmt(line);
+      total += line;
+    });
+    return total;
+  }
+
+  function refreshSummary() {
+    const subtotal = computeSubtotal();
+    const ship = parseFloat(document.querySelector('input[name=ship]:checked').value || '0');
+    const tax = subtotal > 0 ? subtotal * 0.08 : 0;
+    const total = subtotal + ship + tax;
+    document.getElementById('sumSubtotal').textContent = fmt(subtotal);
+    document.getElementById('sumShipping').textContent = fmt(ship);
+    document.getElementById('sumTax').textContent = fmt(tax);
+    document.getElementById('sumTotal').textContent = fmt(total);
+
+    const checked = document.querySelector('input[name=ship]:checked');
+    document.getElementById('shipEta').textContent =
+      checked?.dataset.label?.includes('Express') ? 'ETA 1–2 business days' : 'ETA 3–5 business days';
+  }
+
+  function setStep(active) {
+    document.getElementById('card-shipping').classList.toggle('hidden', active !== 'shipping');
+    document.getElementById('card-payment').classList.toggle('hidden', active !== 'payment');
+    document.getElementById('card-review').classList.toggle('hidden', active !== 'review');
+    document.getElementById('step-pill-shipping').classList.toggle('active', active === 'shipping');
+    document.getElementById('step-pill-payment').classList.toggle('active', active === 'payment');
+    document.getElementById('step-pill-review').classList.toggle('active', active === 'review');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function buildReview() {
+    const subtotal = document.getElementById('sumSubtotal').textContent;
+    const shipping = document.getElementById('sumShipping').textContent;
+    const tax = document.getElementById('sumTax').textContent;
+    const total = document.getElementById('sumTotal').textContent;
+    const name = (document.getElementById('first').value || '') + ' ' + (document.getElementById('last').value || '');
+    const addr = [
+      document.getElementById('addr1').value,
+      document.getElementById('addr2').value,
+      (document.getElementById('city').value || '') + ', ' + (document.getElementById('state').value || '') + ' ' + (document.getElementById('zip').value || ''),
+      document.getElementById('country').value
+    ].filter(Boolean).join('<br>');
+    const email = document.getElementById('email').value;
+    const phone = document.getElementById('phone').value;
+    const shipLabel = document.querySelector('input[name=ship]:checked').dataset.label;
+    document.getElementById('reviewBlock').innerHTML = `
+      <div><strong>Ship To</strong><br>${name}<br>${addr}<br><span class="muted">${email} • ${phone}</span></div>
+      <div class="hr"></div>
+      <div><strong>Totals</strong><br>Subtotal ${subtotal}<br>Shipping (${shipLabel}) ${shipping}<br>Tax ${tax}<br><strong>Total ${total}</strong></div>
+    `;
+  }
+
+  // ------- Stepper clicks -------
+  document.getElementById('step-pill-shipping').addEventListener('click', () => setStep('shipping'));
+  document.getElementById('step-pill-payment').addEventListener('click', () => setStep('payment'));
+  document.getElementById('step-pill-review').addEventListener('click', () => setStep('review'));
+
+  // ------- Events -------
+  document.querySelectorAll('#cartTable input[type=number]').forEach(i => i.addEventListener('input', refreshSummary));
+  document.querySelectorAll('input[name=ship]').forEach(r => r.addEventListener('change', refreshSummary));
+
+  // Gate to Payment: require placeholder CAPTCHA and a subtotal > 0
+  document.getElementById('btnToPayment').addEventListener('click', () => {
+    const ok = document.getElementById('devCaptcha').checked; // replace with real CAPTCHA result
+    if (!ok) { alert('Please complete CAPTCHA (placeholder).'); return; }
+
+    // Build iFrame URL once we’re allowed to show it
+    if (!MFSESS || MFSESS === 'REPLACE_WITH_MFSESS') {
+      alert('Server did not provide MFSESS. Initialize PLP session on your server first.');
+      return;
+    }
+    const iframe = document.getElementById('plp-iframe');
+    iframe.src = `${PLP_BASE_URL}?MFSESS=${encodeURIComponent(MFSESS)}&mode=embedded`;
+    // Redirect fallback for non-JS users:
+    document.getElementById('plp-redirect-link').href = `${PLP_BASE_URL}?MFSESS=${encodeURIComponent(MFSESS)}&mode=redirect`;
+
+    setStep('payment');
+    // plp.js (loaded below) will reveal the iframe and handle redirect to MPTRGT on completion.
+  });
+
+  document.getElementById('btnBackToShip').addEventListener('click', () => setStep('shipping'));
+  document.getElementById('btnToReview').addEventListener('click', () => { buildReview(); setStep('review'); });
+  document.getElementById('btnBackToPayment').addEventListener('click', () => setStep('payment'));
+  document.getElementById('btnPlaceOrder').addEventListener('click', () => {
+    alert('Order placed! (Demo only)'); location.href = '#';
+  });
+
+  // Initial render
+  refreshSummary();
+</script>
+
+<!-- REQUIRED PLP JavaScript (reveals iFrame & posts to MPTRGT when complete) -->
+<script src="https://c3sbx.net/curbstone/plp/scripts/plp.js"></script>
+<!-- If switching to LIVE, change to: https://c3plp.net/curbstone/plp/scripts/plp.js -->
+
+<script>
+  // Optional: respond to PLP events inside the iFrame (advanced)
+  if (window.PLP) {
+    PLP.onFormLoad(function () {
+      // console.log('PLP form loaded');
+    });
+    PLP.onFormSubmit(function () {
+      // console.log('PLP form submitted');
+    });
+    PLP.onFormValidationError(function (data) {
+      // const errors = data.errors.split('|');
+      // console.warn('PLP validation errors', errors);
+    });
+    PLP.onTransactionError(function (data) {
+      // const errors = data.errors.split('|');
+      // console.error('PLP transaction errors', errors);
+    });
+    // Do NOT override PLP.onTransactionCompletion unless you implement your own redirect handling.
+  }
+</script>
+</body>
+</html>
