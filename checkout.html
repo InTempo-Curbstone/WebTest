@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<header style="background:#fff; text-align:center; padding:12px;">
+  <img src="images/TestCheckout.png" alt="Company Logo" style="max-height:80px;">
+</header>
+
+<!-- hCaptcha loader (CAPTCHA appears on Shipping step only) -->
+<script src="https://js.hcaptcha.com/1/api.js" async defer></script>
+
+<style>
+  :root { --accent:#0a66c2; --bg:#f6f7f9; --card:#fff; --muted:#666; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; background:var(--bg); color:#111; }
+  header { background:#111; color:#fff; padding:12px 16px; }
+  header h1 { margin:0; font-size:18px; }
+  .container { max-width:1100px; margin:24px auto; padding:0 16px; }
+  .steps { display:flex; gap:8px; font-size:14px; margin-bottom:16px; flex-wrap:wrap; }
+  .step { padding:8px 12px; border-radius:18px; background:#e9ecf1; color:#333; cursor:pointer; user-select:none; }
+  .step.active { background:var(--accent); color:#fff; }
+  .grid { display:grid; grid-template-columns:1fr 380px; gap:24px; align-items:start; }
+  @media (max-width: 960px) { .grid { grid-template-columns:1fr; } }
+  .card { background:var(--card); border-radius:10px; box-shadow:0 2px 10px rgba(0,0,0,.06); padding:16px; }
+  h2 { margin:0 0 12px; font-size:18px; }
+  table { width:100%; border-collapse:collapse; margin:8px 0 0; }
+  th, td { padding:10px; text-align:center; }
+  th { background:#f0f2f5; font-weight:600; }
+  tr + tr td { border-top:1px solid #eee; }
+  .left { text-align:left; }
+  .right { text-align:right; }
+  .muted { color:#666; font-size:13px; }
+  .summary-row { display:flex; justify-content:space-between; margin:6px 0; }
+  .summary-total { font-weight:700; font-size:18px; }
+  .btn { display:inline-block; width:100%; text-align:center; padding:12px 14px; background:var(--accent); color:#fff; border:none; border-radius:8px; font-weight:600; cursor:pointer; }
+  .btn.secondary { background:#222; }
+  .btn:disabled { opacity:.6; cursor:not-allowed; }
+  .row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .row3 { display:grid; grid-template-columns:1.2fr .8fr .8fr; gap:12px; }
+  label { display:block; font-size:13px; color:#333; margin:8px 0 6px; }
+  input[type=text], input[type=email], input[type=tel], select { width:100%; padding:10px; border:1px solid #ccd; border-radius:8px; background:#fff; }
+  input[type=number] { width:70px; padding:6px; border:1px solid #ccd; border-radius:6px; text-align:right; }
+  .hidden { display:none; }
+  .inline { display:flex; gap:8px; align-items:center; }
+  .badge { background:#eef5ff; color:#134c96; padding:2px 8px; border-radius:999px; font-size:12px; }
+  .hr { height:1px; background:#eee; margin:12px 0; }
+  footer { text-align:center; padding:24px; color:#777; font-size:13px; }
+
+  /* Hosted iFrame wrapper for Payment */
+  #plp-shell { border:1px solid #dde1e7; border-radius:10px; overflow:hidden; background:#fff; }
+  #plp-iframe { display:none; width:100%; min-height:380px; border:0; }
+</style>
+</head>
+<body>
+<header><h1>Demo Checkout</h1></header>
+
+<div class="container">
+  <!-- Clickable step bubbles -->
+  <div class="steps">
+    <div class="step active" id="pill-summary"  data-step="summary">1. Order Summary</div>
+    <div class="step"         id="pill-shipping" data-step="shipping">2. Shipping</div>
+    <div class="step"         id="pill-payment"  data-step="payment">3. Payment</div>
+    <div class="step"         id="pill-review"   data-step="review">4. Confirmation</div>
+  </div>
+
+  <div class="grid">
+    <!-- LEFT column -->
+    <div>
+
+      <!-- STEP 1: ORDER SUMMARY -->
+      <div class="card" id="card-summary">
+        <h2>Order Summary</h2>
+        <div class="muted">Adjust quantities; totals update automatically.</div>
+        <table id="cartTable" aria-label="Shopping cart">
+          <thead>
+            <tr>
+              <th class="left">Product</th>
+              <th>Price</th>
+              <th>Qty</th>
+              <th class="right">Line</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr data-price="0.99">
+              <td class="left">Item1</td>
+              <td>$0.99</td>
+              <td><input type="number" min="0" value="1" /></td>
+              <td class="right line-total">$0.99</td>
+            </tr>
+            <tr data-price="2.50">
+              <td class="left">Item2</td>
+              <td>$2.50</td>
+              <td><input type="number" min="0" value="2" /></td>
+              <td class="right line-total">$5.00</td>
+            </tr>
+            <tr data-price="1.75">
+              <td class="left">Item3</td>
+              <td>$1.75</td>
+              <td><input type="number" min="0" value="1" /></td>
+              <td class="right line-total">$1.75</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="hr"></div>
+        <button class="btn" id="toShipping">Continue to Shipping</button>
+      </div>
+
+      <!-- STEP 2: SHIPPING (hCaptcha here; Payment step must NOT contain CAPTCHA) -->
+      <div class="card hidden" id="card-shipping">
+        <h2>Shipping</h2>
+        <div class="muted">Enter your shipping address and choose a shipping method.</div>
+
+        <div class="row">
+          <div>
+            <label for="first">First name</label>
+            <input id="first" type="text" autocomplete="given-name" />
+          </div>
+          <div>
+            <label for="last">Last name</label>
+            <input id="last" type="text" autocomplete="family-name" />
+          </div>
+        </div>
+
+        <label for="addr1">Address</label>
+        <input id="addr1" type="text" autocomplete="address-line1" />
+        <label for="addr2" class="muted">Apt, suite (optional)</label>
+        <input id="addr2" type="text" autocomplete="address-line2" />
+
+        <div class="row3">
+          <div>
+            <label for="city">City</label>
+            <input id="city" type="text" autocomplete="address-level2" />
+          </div>
+          <div>
+            <label for="state">State/Province</label>
+            <input id="state" type="text" autocomplete="address-level1" />
+          </div>
+          <div>
+            <label for="zip">ZIP/Postal</label>
+            <input id="zip" type="text" autocomplete="postal-code" />
+          </div>
+        </div>
+
+        <div class="row">
+          <div>
+            <label for="country">Country</label>
+            <select id="country">
+              <option value="US" selected>United States</option>
+              <option value="CA">Canada</option>
+              <option value="GB">United Kingdom</option>
+              <option value="AU">Australia</option>
+            </select>
+          </div>
+          <div>
+            <label for="phone">Phone</label>
+            <input id="phone" type="tel" autocomplete="tel" />
+          </div>
+        </div>
+
+        <label for="email">Email (for order updates)</label>
+        <input id="email" type="email" autocomplete="email" />
+
+        <div class="hr"></div>
+        <div class="left" style="display:flex;align-items:center;gap:8px;">
+          <strong>Shipping method</strong> <span class="badge" id="shipEta">ETA 3–5 business days</span>
+        </div>
+        <div class="row">
+          <label style="display:flex;gap:8px;align-items:center;">
+            <input type="radio" name="ship" value="0" data-label="Standard (3–5 business days)" checked />
+            Standard — $0.00
+          </label>
+          <label style="display:flex;gap:8px;align-items:center;">
+            <input type="radio" name="ship" value="9.99" data-label="Express (1–2 business days)" />
+            Express — $9.99
+          </label>
+        </div>
+
+        <div class="hr"></div>
+
+        <!-- hCaptcha requirement: MUST be on page before the hosted iFrame page -->
+        <div class="h-captcha" data-sitekey="67f22162-ce3e-44b4-8d12-aeb8f2c0344e"></div>
+        <br />
+
+        <div class="row">
+          <button class="btn secondary" id="backToSummary">Back to Summary</button>
+          <button class="btn" id="toPayment">Continue to Payment</button>
+        </div>
+      </div>
+
+      <!-- STEP 3: PAYMENT (Curbstone PLP hosted iFrame) -->
+      <div class="card hidden" id="card-payment">
+        <h2>Payment</h2>
+        <div class="muted">
+          Secure card entry is embedded below and is hosted by Curbstone (no PAN/CVV on your server).
+        </div>
+
+        <div id="plp-shell">
+          <!-- The iFrame src is set in JS after MFSESS is returned by /plp_init.php -->
+          <iframe id="plp-iframe" title="Secure Card Entry"></iframe>
+        </div>
+
+        <!-- No-JS fallback (redirect mode) -->
+        <noscript>
+          <p class="muted" style="margin-top:10px;">
+            JavaScript is disabled. Continue to the
+            <a id="plp-redirect-link" href="#">payment portal</a>.
+          </p>
+        </noscript>
+
+        <div class="hr"></div>
+        <div class="row">
+          <button class="btn secondary" id="backToShipping">Back to Shipping</button>
+          <button class="btn" id="toReview">Review & Place Order</button>
+        </div>
+      </div>
+
+      <!-- STEP 4: CONFIRMATION -->
+      <div class="card hidden" id="card-review">
+        <h2>Confirmation</h2>
+        <p class="muted" id="confirmMsg">Thank you! Your order has been placed.</p>
+        <div id="confirmDetails"></div>
+        <div class="hr"></div>
+        <button class="btn" id="newOrder">Start New Order</button>
+      </div>
+
+    </div>
+
+    <!-- RIGHT column: Totals -->
+    <aside class="card" id="summary">
+      <h2>Totals</h2>
+      <div class="summary-row"><span>Subtotal</span><span id="sumSubtotal">$0.00</span></div>
+      <div class="summary-row"><span>Shipping</span><span id="sumShipping">$0.00</span></div>
+      <div class="summary-row"><span>Tax (8%)</span><span id="sumTax">$0.00</span></div>
+      <div class="hr"></div>
+      <div class="summary-row summary-total"><span>Total</span><span id="sumTotal">$0.00</span></div>
+      <div class="muted" style="margin-top:10px;">Demo page. No data is sent anywhere.</div>
+    </aside>
+  </div>
+</div>
+
+<footer>Demo checkout • Apache test page</footer>
+
+<script>
+  /* ================== CONFIG ================== */
+  // Use SANDBOX while developing:
+  const PLP_BASE_URL = 'https://c3sbx.net/curbstone/plp/';     // SANDBOX
+  // Switch to LIVE when ready:
+  // const PLP_BASE_URL = 'https://c3plp.net/curbstone/plp/';  // LIVE
+
+  // This page will fetch MFSESS dynamically from /plp_init.php
+  let MFSESS = '';
+
+  /* =============== Utilities & math =============== */
+  const fmt = n => '$' + (Math.round(n * 100) / 100).toFixed(2);
+
+  function computeSubtotal() {
+    let total = 0;
+    document.querySelectorAll('#cartTable tbody tr').forEach(row => {
+      const price = parseFloat(row.dataset.price || '0');
+      const qty = parseInt(row.querySelector('input[type=number]').value || '0', 10);
+      const line = price * qty;
+      row.querySelector('.line-total').textContent = fmt(line);
+      total += line;
+    });
+    return total;
+  }
+
+  function refreshSummary() {
+    const subtotal = computeSubtotal();
+    const ship = parseFloat(document.querySelector('input[name=ship]:checked')?.value || '0');
+    const tax = subtotal > 0 ? subtotal * 0.08 : 0;
+    const total = subtotal + ship + tax;
+
+    document.getElementById('sumSubtotal').textContent = fmt(subtotal);
+    document.getElementById('sumShipping').textContent = fmt(ship);
+    document.getElementById('sumTax').textContent = fmt(tax);
+    document.getElementById('sumTotal').textContent = fmt(total);
+
+    const checked = document.querySelector('input[name=ship]:checked');
+    document.getElementById('shipEta').textContent =
+      checked?.dataset.label?.includes('Express') ? 'ETA 1–2 business days' : 'ETA 3–5 business days';
+  }
+
+  /* ================== Stepper ================== */
+  function setStep(step) {
+    const cards = { summary:'card-summary', shipping:'card-shipping', payment:'card-payment', review:'card-review' };
+    const pills =  { summary:'pill-summary', shipping:'pill-shipping', payment:'pill-payment', review:'pill-review' };
+    Object.keys(cards).forEach(k => {
+      document.getElementById(cards[k]).classList.toggle('hidden', k !== step);
+      document.getElementById(pills[k]).classList.toggle('active', k === step);
+    });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  // Clickable step bubbles
+  document.querySelectorAll('.steps .step').forEach(pill => {
+    pill.addEventListener('click', () => setStep(pill.dataset.step));
+  });
+
+  /* =============== Fetch MFSESS from your server =============== */
+  async function fetchMFSESS() {
+    // Build a payload from the page fields (non-card data only)
+    const payload = new URLSearchParams({
+      MFAMT1: document.getElementById('sumTotal').textContent.replace('$',''),
+      MFNAME: (document.getElementById('first').value || '') + ' ' + (document.getElementById('last').value || ''),
+      MFADD1: document.getElementById('addr1').value || '',
+      MFADD2: document.getElementById('addr2').value || '',
+      MFCITY: document.getElementById('city').value || '',
+      MFSTAT: document.getElementById('state').value || '',
+      MFZIPC: document.getElementById('zip').value || '',
+      MPCUST: (document.getElementById('email').value || ''),
+      MFREFR: 'INV-' + Date.now(),
+      MFORDR: 'PO-' + Math.floor(Math.random()*1e6)
+    });
+
+    const res = await fetch('/plp_init.php', { method: 'POST', body: payload });
+    if (!res.ok) throw new Error('Init request failed: ' + res.status);
+    const json = await res.json();
+    if (json.MFRTRN !== 'UG' || !json.MFSESS) {
+      throw new Error(json.MFRTXT || 'Init returned no session');
+    }
+    return json.MFSESS;
+  }
+
+  /* =============== Event wiring =============== */
+  document.getElementById('toShipping').addEventListener('click', () => setStep('shipping'));
+  document.getElementById('backToSummary').addEventListener('click', () => setStep('summary'));
+
+  // Validate hCaptcha before showing Payment; then fetch MFSESS and set PLP iFrame src
+  document.getElementById('toPayment').addEventListener('click', async () => {
+    const captchaResponse = document.querySelector('[name="h-captcha-response"]')?.value;
+    if (!captchaResponse) {
+      alert('Please complete the hCaptcha before continuing to Payment.');
+      return;
+    }
+
+    try {
+      // Get or reuse MFSESS
+      MFSESS = MFSESS || await fetchMFSESS();
+
+      // Build iFrame src for embedded mode; noscript uses redirect mode
+      const iframe = document.getElementById('plp-iframe');
+      iframe.src = `${PLP_BASE_URL}?MFSESS=${encodeURIComponent(MFSESS)}&mode=embedded`;
+      const redirectLink = document.getElementById('plp-redirect-link');
+      if (redirectLink) redirectLink.href = `${PLP_BASE_URL}?MFSESS=${encodeURIComponent(MFSESS)}&mode=redirect`;
+
+      setStep('payment'); // plp.js will reveal the iFrame and post back to MPTRGT
+    } catch (err) {
+      alert('Unable to initialize payment: ' + err.message);
+    }
+  });
+
+  document.getElementById('backToShipping').addEventListener('click', () => setStep('shipping'));
+  document.getElementById('toReview').addEventListener('click', () => { buildConfirmation(); setStep('review'); });
+
+  document.getElementById('newOrder').addEventListener('click', () => {
+    document.querySelectorAll('#cartTable input[type=number]').forEach(inp => inp.value = (inp.defaultValue || 0));
+    refreshSummary();
+    setStep('summary');
+  });
+
+  /* =============== Confirmation builder (demo) =============== */
+  function buildConfirmation() {
+    const orderId = 'NUC-' + Math.floor(Math.random() * 900000 + 100000);
+    const name = (document.getElementById('first').value || '') + ' ' + (document.getElementById('last').value || '');
+    const addr = [
+      document.getElementById('addr1').value,
+      document.getElementById('addr2').value,
+      (document.getElementById('city').value || '') + ', ' + (document.getElementById('state').value || '') + ' ' + (document.getElementById('zip').value || ''),
+      document.getElementById('country').value
+    ].filter(Boolean).join('<br>');
+
+    const totals = {
+      sub: document.getElementById('sumSubtotal').textContent,
+      ship: document.getElementById('sumShipping').textContent,
+      tax: document.getElementById('sumTax').textContent,
+      total: document.getElementById('sumTotal').textContent
+    };
+    const shipLabel = document.querySelector('input[name=ship]:checked')?.dataset.label || 'Standard';
+
+    let lines = '<table style="width:100%;border-collapse:collapse;margin-top:8px;">' +
+                '<tr style="background:#f0f2f5;"><th style="text-align:left;padding:8px;">Item</th><th>Qty</th><th class="right" style="padding:8px;">Line</th></tr>';
+    document.querySelectorAll('#cartTable tbody tr').forEach(row => {
+      const title = row.children[0].textContent;
+      const qty = row.querySelector('input[type=number]').value;
+      const line = row.querySelector('.line-total').textContent;
+      if (parseInt(qty,10) > 0) {
+        lines += `<tr><td class="left" style="padding:8px;">${title}</td><td style="text-align:center;">${qty}</td><td class="right" style="padding:8px;">${line}</td></tr>`;
+      }
+    });
+    lines += '</table>';
+
+    document.getElementById('confirmMsg').innerHTML =
+      `Thank you, <strong>${name || 'Shopper'}</strong>! Your order <strong>${orderId}</strong> has been placed.`;
+
+    document.getElementById('confirmDetails').innerHTML = `
+      <div class="hr"></div>
+      <div><strong>Ship To</strong><br>${addr || 'No address provided'}</div>
+      <div class="hr"></div>
+      <div><strong>Items</strong>${lines}</div>
+      <div class="hr"></div>
+      <div><strong>Shipping Method</strong><br>${shipLabel}</div>
+      <div class="hr"></div>
+      <div><strong>Totals</strong><br>
+        Subtotal ${totals.sub}<br>
+        Shipping ${totals.ship}<br>
+        Tax ${totals.tax}<br>
+        <strong>Total ${totals.total}</strong>
+      </div>
+    `;
+  }
+
+  // Initial render
+  document.querySelectorAll('#cartTable input[type=number]').forEach(inp => inp.addEventListener('input', refreshSummary));
+  document.querySelectorAll('input[name=ship]').forEach(r => r.addEventListener('change', refreshSummary));
+  refreshSummary();
+  setStep('summary');
+</script>
+
+<!-- REQUIRED: Curbstone PLP library (reveals iFrame & posts to MPTRGT on completion) -->
+<script src="https://c3sbx.net/curbstone/plp/scripts/plp.js"></script>
+<!-- Switch to LIVE when ready: https://c3plp.net/curbstone/plp/scripts/plp.js -->
+<footer style="background:#f6f7f9; text-align:center; padding:20px; margin-top:40px; font-size:14px; color:#555;">
+  <p>For any site questions or issues please contact Tyler. <a href="mailto:tyler.harbeke@curbstone.com"></p>
+</footer>
+</body>
+</html>
